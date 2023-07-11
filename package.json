@@ -1,0 +1,52 @@
+{
+  "name": "@broxus/locklift-network",
+  "version": "0.9.0",
+  "description": "In-memory TVM-blockchain emulator for locklift",
+  "directories": {
+    "example": "examples"
+  },
+  "keywords": [
+    "Everscale",
+    "TON",
+    "Venom",
+    "blockchain",
+    "smart-contracts",
+    "javascript",
+    "solidity",
+    "dapps",
+    "ethereum",
+    "tools"
+  ],
+  "files": [
+    "internal/",
+    "src/",
+    "README.md",
+    "*.d.ts",
+    "*.d.ts.map",
+    "*.js",
+    "*.js.map",
+    "tsconfig-base.json",
+    "tsconfig.json"
+  ],
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "tsc --build ."
+  },
+  "author": "30mb1 <steam.30mb1@gmail.com>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@types/node": "^18.0.4",
+    "heap-js": "2.3.0",
+    "lodash": "^4.17.21",
+    "everscale-inpage-provider": "file:../everscale-inpage-provider/dist",
+    "everscale-standalone-client": "file:../everscale-standalone-client/dist",
+    "nekoton-wasm": "file:../nekoton-wasm/pkg",
+    "prettier": "^2.7.1",
+    "typescript": "^4.7.4"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.195"
+  }
+}

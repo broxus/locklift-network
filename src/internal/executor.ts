@@ -1,5 +1,5 @@
-import * as nt from "../../../nekoton-wasm/pkg";
-import {Address, FullContractState} from "../../../everscale-inpage-provider";
+import * as nt from "nekoton-wasm";
+import {Address, FullContractState} from "everscale-inpage-provider";
 import {Heap} from "heap-js";
 import _ from "lodash";
 

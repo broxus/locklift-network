@@ -4,7 +4,7 @@ import {LockliftExecutor} from "./internal/executor";
 import {LockliftTransport} from "./internal/transport";
 
 
-class _LockliftNetwork {
+class LockliftNetwork {
   private readonly _transport: LockliftTransport;
   private readonly _connectionFactory: ConnectionFactory;
   private readonly _executor: LockliftExecutor;
@@ -41,5 +41,4 @@ class ProxyConnectionFactory implements ConnectionFactory {
   }
 }
 
-const LockliftNetwork = new _LockliftNetwork();
 export {LockliftNetwork}

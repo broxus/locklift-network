@@ -4,7 +4,7 @@ import {LockliftExecutor} from "./internal/executor";
 import {LockliftTransport} from "./internal/transport";
 
 
-class LockliftNetwork {
+export class LockliftNetwork {
   private readonly _transport: LockliftTransport;
   private readonly _connectionFactory: ConnectionFactory;
   private readonly _executor: LockliftExecutor;
@@ -24,8 +24,8 @@ class LockliftNetwork {
     return this._connectionFactory;
   }
 
-  getDstTransaction(msg_hash: string): nt.JsRawTransaction | undefined {
-    return this._executor.getDstTransaction(msg_hash);
+  getTxTrace(tx_hash: string): nt.EngineTraceInfo[] | undefined {
+    return this._executor.getTxTrace(tx_hash);
   }
 }
 
@@ -40,5 +40,3 @@ class ProxyConnectionFactory implements ConnectionFactory {
     return new nt.ProxyConnection(clock, this.transport);
   }
 }
-
-export {LockliftNetwork}

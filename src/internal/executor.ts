@@ -9,6 +9,8 @@ type ExecutorState = {
   accounts: { [id: string]: FullContractState },
   // tx_id -> tx
   transactions: { [id: string]: nt.JsRawTransaction },
+  // tx_id -> trace
+  traces: { [id: string]: nt.EngineTraceInfo[] },
   // msg_hash -> tx_id
   msgToTransaction: { [msg_hash: string]: string },
   // address -> tx_ids
@@ -31,7 +33,7 @@ const GIVER_ADDRESS = '0:ece57bcc6c530283becbbd8a3b24d3c5987cdddc3c8b7b33be6e4a6
 
 export class LockliftExecutor {
   private state: ExecutorState;
-  private breakpoints: { [id: string]: ExecutorState } = {};
+  private snapshots: { [id: string]: ExecutorState } = {};
   private nonce: number = 0;
   private readonly blockchainConfig: string;
   private readonly globalId: number;
@@ -49,6 +51,7 @@ export class LockliftExecutor {
       transactions: {},
       msgToTransaction: {},
       addrToTransactions: {},
+      traces: {},
       messageQueue: new Heap<nt.JsRawMessage>(messageComparator)
     };
     // set this in order to pass standalone-client checks
@@ -77,10 +80,15 @@ export class LockliftExecutor {
     return this.state.accounts;
   }
 
-  private saveTransaction(tx: nt.JsRawTransaction) {
+  getTxTrace(tx_id: string): nt.EngineTraceInfo[] | undefined {
+    return this.state.traces[tx_id];
+  }
+
+  private saveTransaction(tx: nt.JsRawTransaction, trace: nt.EngineTraceInfo[]) {
     this.state.transactions[tx.hash] = tx;
     this.state.msgToTransaction[tx.inMessage.hash] = tx.hash;
     this.state.addrToTransactions[tx.inMessage.dst!] = ([tx.hash]).concat(this.state.addrToTransactions[tx.inMessage.dst!] || []);
+    this.state.traces[tx.hash] = trace;
   }
 
   getDstTransaction(msg_hash: string): nt.JsRawTransaction | undefined {
@@ -99,34 +107,29 @@ export class LockliftExecutor {
     return raw_txs.filter((tx) => Number(tx.lt) <= Number(fromLt)).slice(0, count);
   }
 
-  setBreakpoint(): number {
-    this.breakpoints[this.nonce] = _.cloneDeep(this.state);
+  saveSnapshot(): number {
+    this.snapshots[this.nonce] = _.cloneDeep(this.state);
     // postincrement!
-    console.log(this.breakpoints[this.nonce].messageQueue.size())
+    // console.log(this.snapshots[this.nonce].messageQueue.size())
     return this.nonce++;
   }
 
-  resumeBreakpoint(id: number) {
-    if (this.breakpoints[id] === undefined) {
-      throw new Error(`Breakpoint ${id} not found`);
+  loadSnapshot(id: number) {
+    if (this.snapshots[id] === undefined) {
+      throw new Error(`Snapshot ${id} not found`);
     }
-    this.state = this.breakpoints[id];
+    this.state = this.snapshots[id];
   }
 
-  clearBreakpoints() {
-    this.breakpoints = {};
+  clearSnapshots() {
+    this.snapshots = {};
   }
 
   // process all msgs in queue
   processQueue() {
-    const q = Math.random();
-    console.time(`processQueue ${q}`)
-    const w = this.msgs;
     while (this.state.messageQueue.size() > 0) {
       this.processNextMsg();
     }
-    console.timeEnd(`processQueue ${q}`)
-    console.log(`processed ${this.msgs - w} messages`)
   }
 
   // process msg with lowest lt in queue
@@ -136,7 +139,7 @@ export class LockliftExecutor {
     if (!message) return;
     this.msgs += 1;
     const receiver_acc = this.getAccount(message.dst!);
-    const res = nt.executeLocalExtended(
+    let res: nt.TransactionExecutorExtendedOutput = nt.executeLocalExtended(
       this.blockchainConfig,
       receiver_acc ? nt.makeFullAccountBoc(receiver_acc.boc) : EMPTY_STATE,
       message.boc,
@@ -144,17 +147,24 @@ export class LockliftExecutor {
       false,
       undefined,
       this.globalId,
-      true
+      false
     );
+    if ('account' in res && res.transaction.description.aborted) {
+      // run 1 more time with trace on
+      res = nt.executeLocalExtended(
+        this.blockchainConfig,
+        receiver_acc ? nt.makeFullAccountBoc(receiver_acc.boc) : EMPTY_STATE,
+        message.boc,
+        Math.floor(this.clock!.nowMs / 1000),
+        false,
+        undefined,
+        this.globalId,
+        true
+      );
+    }
     if ('account' in res) {
-      // if (res.transaction.description.aborted) {
-      //   const q = res.trace.map((t) => JSON.stringify(t)).join('\n');
-      //   fs.writeFileSync('log.txt', q);
-      // }
-      // console.log(res.trace);
-      // process.exit(1);
       this.setAccount(message.dst!, res.account);
-      this.saveTransaction(res.transaction);
+      this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {
         if (msg.dst === undefined) return; // event
         this.enqueueMsg(msg);

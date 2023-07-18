@@ -1,48 +1,39 @@
 import * as nt from "nekoton-wasm";
-import {Address, FullContractState} from "everscale-inpage-provider";
-import {Heap} from "heap-js";
+import { Address, FullContractState } from "everscale-inpage-provider";
+import { Heap } from "heap-js";
 import _ from "lodash";
+import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => (a.lt || 0) - (b.lt || 0);
 
 type ExecutorState = {
-  accounts: { [id: string]: FullContractState },
+  accounts: { [id: string]: FullContractState };
   // tx_id -> tx
-  transactions: { [id: string]: nt.JsRawTransaction },
+  transactions: { [id: string]: nt.JsRawTransaction };
   // tx_id -> trace
-  traces: { [id: string]: nt.EngineTraceInfo[] },
+  traces: { [id: string]: nt.EngineTraceInfo[] };
   // msg_hash -> tx_id
-  msgToTransaction: { [msg_hash: string]: string },
+  msgToTransaction: { [msg_hash: string]: string };
   // address -> tx_ids
-  addrToTransactions: { [addr: string]: string[] },
-  messageQueue: Heap<nt.JsRawMessage>
-}
+  addrToTransactions: { [addr: string]: string[] };
+  messageQueue: Heap<nt.JsRawMessage>;
+};
 
 interface LockliftTransport {
   getBlockchainConfig(): string[];
   setExecutor(executor: LockliftExecutor): void;
 }
 
-
-const ZERO_ADDRESS = new Address("0:0000000000000000000000000000000000000000000000000000000000000000");
-const EMPTY_STATE = "te6ccgEBAQEAAwAAAUA=";
-const TEST_CODE_HASH = '4e92716de61d456e58f16e4e867e3e93a7548321eace86301b51c8b80ca6239b';
-const GIVER_BOC = 'te6ccgECIQEABFoAAnaAHZyveY2KYFB32XexR2SaeLMPm7uHkW9md83JTGJJIIKkhQ+VBknFzjAAAAAAAAAAbCKxxDS+yMZIJgcBAUEq2i5lq47qsJSQ41IUFfRbbkLfnHYKY5vPU5V1ULJaFuACAgFiBgMCASAFBABRvzSrPJndvUQ61TKk+Cqu2L3CV0kGnMQRXgBDOjRs8tU8AAAAAZJxdH4AUb8rzBuq86/oRvU/aQDbWjxnNHZbnv9/+hpEJ/JT9SQ+hAAAAAGScXR+AFG/XSPMYBMlpt6yUJ+Mf4TBdDY4l9KxuF8dWpEiOsPyK/AAAAAB/////wIm/wD0pCAiwAGS9KDhiu1TWDD0oQoIAQr0pCD0oQkAAAIBIA4LAQL/DAH+fyHtRNAg10nCAZ/T/9MA9AX4an/4Yfhm+GKOG/QFbfhqcAGAQPQO8r3XC//4YnD4Y3D4Zn/4YeLTAAGOEoECANcYIPkBWPhCIPhl+RDyqN4j+EUgbpIwcN74Qrry4GUh0z/THzQg+CO88rki+QAg+EqBAQD0DiCRMd7y0Gb4AA0ANiD4SiPIyz9ZgQEA9EP4al8E0x8B8AH4R27yfAIBIBUPAgFYExABCbjomPxQEQHW+EFujhLtRNDT/9MA9AX4an/4Yfhm+GLe0XBtbwL4SoEBAPSGlQHXCz9/k3BwcOKRII4yXzPIIs8L/yHPCz8xMQFvIiGkA1mAIPRDbwI0IvhKgQEA9HyVAdcLP3+TcHBw4gI1MzHoXwMhwP8SAJiOLiPQ0wH6QDAxyM+HIM6NBAAAAAAAAAAAAAAAAA90TH4ozxYhbyICyx/0AMlx+wDeMMD/jhL4QsjL//hGzwsA+EoB9ADJ7VTef/hnAQm5Fqvn8BQAtvhBbo427UTQINdJwgGf0//TAPQF+Gp/+GH4Zvhijhv0BW34anABgED0DvK91wv/+GJw+GNw+GZ/+GHi3vhG8nNx+GbR+AD4QsjL//hGzwsA+EoB9ADJ7VR/+GcCASAZFgEJuxXvk1gXAbb4QW6OEu1E0NP/0wD0Bfhqf/hh+Gb4Yt76QNcNf5XU0dDTf9/XDACV1NHQ0gDf0VRxIMjPhYDKAHPPQM4B+gKAa89AyXP7APhKgQEA9IaVAdcLP3+TcHBw4pEgGACEjigh+CO7myL4SoEBAPRbMPhq3iL4SoEBAPR8lQHXCz9/k3BwcOICNTMx6F8G+ELIy//4Rs8LAPhKAfQAye1Uf/hnAgEgHBoBCbjkYYdQGwC++EFujhLtRNDT/9MA9AX4an/4Yfhm+GLe1NH4RSBukjBw3vhCuvLgZfgA+ELIy//4Rs8LAPhKAfQAye1U+A8g+wQg0O0e7VPwAjD4QsjL//hGzwsA+EoB9ADJ7VR/+GcCAtofHQEBSB4ALPhCyMv/+EbPCwD4SgH0AMntVPgP8gABAUggAFhwItDWAjHSADDcIccA3CHXDR/yvFMR3cEEIoIQ/////byx8nwB8AH4R27yfA==';
-const GIVER_ADDRESS = '0:ece57bcc6c530283becbbd8a3b24d3c5987cdddc3c8b7b33be6e4a6312490415';
-
-
 export class LockliftExecutor {
   private state: ExecutorState;
   private snapshots: { [id: string]: ExecutorState } = {};
-  private nonce: number = 0;
+  private nonce = 0;
   private readonly blockchainConfig: string;
   private readonly globalId: number;
   private clock: nt.ClockWithOffset | undefined;
-  private msgs: number = 0;
+  private msgs = 0;
 
-  constructor(
-    private readonly transport: LockliftTransport
-  ) {
+  constructor(private readonly transport: LockliftTransport) {
     const config = transport.getBlockchainConfig();
     this.blockchainConfig = config[0];
     this.globalId = Number(config[1]);
@@ -52,7 +43,7 @@ export class LockliftExecutor {
       msgToTransaction: {},
       addrToTransactions: {},
       traces: {},
-      messageQueue: new Heap<nt.JsRawMessage>(messageComparator)
+      messageQueue: new Heap<nt.JsRawMessage>(messageComparator),
     };
     // set this in order to pass standalone-client checks
     this.state.accounts[ZERO_ADDRESS.toString()] = nt.parseFullAccountBoc(nt.makeFullAccountBoc(GIVER_BOC))!;
@@ -64,7 +55,7 @@ export class LockliftExecutor {
   }
 
   setClock(clock: nt.ClockWithOffset) {
-    if (this.clock !== undefined) throw new Error('Clock already set');
+    if (this.clock !== undefined) throw new Error("Clock already set");
     this.clock = clock;
   }
 
@@ -87,7 +78,9 @@ export class LockliftExecutor {
   private saveTransaction(tx: nt.JsRawTransaction, trace: nt.EngineTraceInfo[]) {
     this.state.transactions[tx.hash] = tx;
     this.state.msgToTransaction[tx.inMessage.hash] = tx.hash;
-    this.state.addrToTransactions[tx.inMessage.dst!] = ([tx.hash]).concat(this.state.addrToTransactions[tx.inMessage.dst!] || []);
+    this.state.addrToTransactions[tx.inMessage.dst!] = [tx.hash].concat(
+      this.state.addrToTransactions[tx.inMessage.dst!] || [],
+    );
     this.state.traces[tx.hash] = trace;
   }
 
@@ -102,9 +95,9 @@ export class LockliftExecutor {
   }
 
   getTransactions(address: Address | string, fromLt: string, count: number): nt.JsRawTransaction[] {
-    const raw_txs = (this.state.addrToTransactions[address.toString()] || []).map((id) => this.state.transactions[id]);
+    const raw_txs = (this.state.addrToTransactions[address.toString()] || []).map(id => this.state.transactions[id]);
     // return raw_txs;
-    return raw_txs.filter((tx) => Number(tx.lt) <= Number(fromLt)).slice(0, count);
+    return raw_txs.filter(tx => Number(tx.lt) <= Number(fromLt)).slice(0, count);
   }
 
   saveSnapshot(): number {
@@ -147,9 +140,9 @@ export class LockliftExecutor {
       false,
       undefined,
       this.globalId,
-      false
+      false,
     );
-    if ('account' in res && res.transaction.description.aborted) {
+    if ("account" in res && res.transaction.description.aborted) {
       // run 1 more time with trace on
       res = nt.executeLocalExtended(
         this.blockchainConfig,
@@ -159,10 +152,10 @@ export class LockliftExecutor {
         false,
         undefined,
         this.globalId,
-        true
+        true,
       );
     }
-    if ('account' in res) {
+    if ("account" in res) {
       this.setAccount(message.dst!, res.account);
       this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {

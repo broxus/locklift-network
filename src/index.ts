@@ -23,8 +23,8 @@ export class LockliftNetwork {
     return this._connectionFactory;
   }
 
-  getTxTrace(tx_hash: string): nt.EngineTraceInfo[] | undefined {
-    return this._executor.getTxTrace(tx_hash);
+  getTxTrace(txHash: string): nt.EngineTraceInfo[] | undefined {
+    return this._executor.getTxTrace(txHash);
   }
 }
 

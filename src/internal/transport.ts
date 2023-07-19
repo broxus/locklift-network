@@ -23,9 +23,13 @@ export class LockliftTransport implements nt.IProxyConnector {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getAccountsByCodeHash(codeHash: string, limit: number, continuation?: string): string[] {
-    return Object.entries(this.executor!.getAccounts())
-      .filter(([_, state]) => state.codeHash === codeHash)
-      .map(([address, _]) => address);
+    return (
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      Object.entries(this.executor!.getAccounts())
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .filter(([_, state]) => state.codeHash === codeHash)
+        .map(([address, _]) => address)
+    );
   }
 
   // @ts-ignore
@@ -34,7 +38,7 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getCapabilities(clock_offset_as_sec: string, clock_offset_as_ms: string): string[] {
+  getCapabilities(clockOffsetAsSec: string, clockOffsetAsMs: string): string[] {
     if (this.cache["capabilities"] === undefined) {
       const config = this.getBlockchainConfig();
       const cap = nt.getCapabilitiesFromConfig(config[0]);
@@ -44,10 +48,12 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   getContractState(address: string): nt.RawContractState | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const acc = this.executor!.getAccount(address);
     if (acc !== undefined) {
       return {
         account: acc.boc,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         lastTransactionId: acc.lastTransactionId!,
         timings: acc.genTimings,
         type: "exists",
@@ -55,8 +61,9 @@ export class LockliftTransport implements nt.IProxyConnector {
     }
   }
 
-  getDstTransaction(msg_hash: string): string | undefined {
-    return this.executor!.getDstTransaction(msg_hash)?.boc;
+  getDstTransaction(msgHash: string): string | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.executor!.getDstTransaction(msgHash)?.boc;
   }
 
   getLatestKeyBlock(): string {
@@ -64,15 +71,19 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   getTransaction(id: string): string | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return this.executor!.getTransaction(id)?.boc;
   }
 
   getTransactions(address: string, fromLt: string, count: number): string[] {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return this.executor!.getTransactions(address, fromLt, count).map(tx => tx.boc);
   }
 
   sendMessage(message: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.executor!.enqueueMsg(nt.parseMessageBase64Extended(message));
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.executor!.processQueue();
   }
 }

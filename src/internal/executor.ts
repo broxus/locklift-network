@@ -88,20 +88,22 @@ export class LockliftExecutor {
   }
 
   getDstTransaction(msgHash: string): nt.JsRawTransaction | undefined {
-    // console.log('get dst tx');
     return this.state.transactions[this.state.msgToTransaction[msgHash]];
   }
 
   getTransaction(id: string): nt.JsRawTransaction | undefined {
-    // console.log('get transaction');
     return this.state.transactions[id];
   }
 
-  // TODO: optimize
   getTransactions(address: Address | string, fromLt: string, count: number): nt.JsRawTransaction[] {
-    const rawTxs = (this.state.addrToTransactions[address.toString()] || []).map(id => this.state.transactions[id]);
-    // return rawTxs;
-    return rawTxs.filter(tx => Number(tx.lt) <= Number(fromLt)).slice(0, count);
+    const result: nt.JsRawTransaction[] = [];
+    for (const txId of (this.state.addrToTransactions[address.toString()] || [])) {
+      const rawTx = this.state.transactions[txId];
+      if (Number(rawTx.lt) > Number(fromLt)) continue;
+      result.push(rawTx);
+      if (result.length >= count) return result;
+    }
+    return result;
   }
 
   saveSnapshot(): number {

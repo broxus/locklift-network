@@ -43,8 +43,8 @@
   "dependencies": {
     "heap-js": "2.3.0",
     "lodash": "^4.17.21",
-    "everscale-inpage-provider": "file:../everscale-inpage-provider/dist",
-    "everscale-standalone-client": "file:../everscale-standalone-client/dist",
+    "everscale-inpage-provider": "^0.3.61",
+    "everscale-standalone-client": "^2.1.21",
     "nekoton-wasm": "file:../nekoton-wasm/pkg",
     "typescript": "^4.7.4"
   },

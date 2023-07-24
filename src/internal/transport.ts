@@ -1,6 +1,7 @@
 import * as nt from "nekoton-wasm";
-import { LockliftExecutor } from "./executor";
-import { MAIN_CONFIG } from "./constants";
+import {LockliftExecutor} from "./executor";
+import {EMPTY_STATE, MAIN_CONFIG} from "./constants";
+import {BlockchainConfig, NetworkCapabilities} from "nekoton-wasm";
 
 export class LockliftTransport implements nt.IProxyConnector {
   private executor: LockliftExecutor | undefined;
@@ -12,78 +13,75 @@ export class LockliftTransport implements nt.IProxyConnector {
 
   info(): nt.TransportInfo {
     return {
-      // eslint-disable-next-line camelcase
-      max_transactions_per_fetch: 255,
-      // eslint-disable-next-line camelcase
-      reliable_behavior: "IntensivePolling",
-      // eslint-disable-next-line camelcase
-      has_key_blocks: false,
+      hasKeyBlocks: false,
+      maxTransactionsPerFetch: 255,
+      reliableBehavior: "IntensivePolling"
     };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getAccountsByCodeHash(codeHash: string, limit: number, continuation?: string): string[] {
-    return (
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      Object.entries(this.executor!.getAccounts())
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        .filter(([_, state]) => state.codeHash === codeHash)
-        .map(([address, _]) => address)
-    );
+  getAccountsByCodeHash(codeHash: string, limit: number, continuation?: string): Promise<string[]> {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const q = Object.entries(this.executor!.getAccounts())
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .filter(([_, state]) => state.codeHash === codeHash)
+      .map(([address, _]) => address);
+    return Promise.resolve(q);
   }
 
   // @ts-ignore
-  getBlockchainConfig(): string[] {
-    return [MAIN_CONFIG, "42"];
+  getBlockchainConfig(): Promise<BlockchainConfig> {
+    return Promise.resolve({
+      boc: MAIN_CONFIG,
+      globalId: 42
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getCapabilities(clockOffsetAsSec: string, clockOffsetAsMs: string): string[] {
-    if (this.cache["capabilities"] === undefined) {
-      const config = this.getBlockchainConfig();
-      const cap = nt.getCapabilitiesFromConfig(config[0]);
-      this.cache["capabilities"] = [config[1], cap.toString()];
-    }
-    return this.cache["capabilities"];
+  async getCapabilities(nowMs: string): Promise<NetworkCapabilities> {
+    const config = await this.getBlockchainConfig();
+    return new Promise<NetworkCapabilities>(() => {
+      if (this.cache["capabilities"] === undefined) {
+        const cap = nt.getCapabilitiesFromConfig(config.boc);
+        this.cache["capabilities"] = {
+          globalId: config.globalId,
+          capabilities: cap.toString()
+        };
+      }
+      return this.cache["capabilities"];
+    });
   }
 
-  getContractState(address: string): nt.RawContractState | undefined {
+  getContractState(address: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const acc = this.executor!.getAccount(address);
-    if (acc !== undefined) {
-      return {
-        account: acc.boc,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        lastTransactionId: acc.lastTransactionId!,
-        timings: acc.genTimings,
-        type: "exists",
-      };
-    }
+    const state = this.executor!.getAccount(address);
+    return Promise.resolve(state?.boc == null ? EMPTY_STATE : state.boc);
   }
 
-  getDstTransaction(msgHash: string): string | undefined {
+  getDstTransaction(msgHash: string): Promise<string | undefined> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.executor!.getDstTransaction(msgHash)?.boc;
+    return Promise.resolve(this.executor!.getDstTransaction(msgHash)?.boc);
   }
 
-  getLatestKeyBlock(): string {
-    return "";
+  getLatestKeyBlock(): Promise<string> {
+    return Promise.resolve("");
   }
 
-  getTransaction(id: string): string | undefined {
+  getTransaction(id: string): Promise<string | undefined> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.executor!.getTransaction(id)?.boc;
+    return Promise.resolve(this.executor!.getTransaction(id)?.boc);
   }
 
-  getTransactions(address: string, fromLt: string, count: number): string[] {
+  getTransactions(address: string, fromLt: string, count: number): Promise<string[]> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.executor!.getTransactions(address, fromLt, count).map(tx => tx.boc);
+    return Promise.resolve(this.executor!.getTransactions(address, fromLt, count).map(tx => tx.boc));
   }
 
-  sendMessage(message: string): void {
+  sendMessage(message: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.executor!.enqueueMsg(nt.parseMessageBase64Extended(message));
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.executor!.processQueue();
+    return Promise.resolve();
   }
 }

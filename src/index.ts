@@ -19,6 +19,10 @@ export class LockliftNetwork {
     this._connectionFactory = new ProxyConnectionFactory(this._transport, _onClock);
   }
 
+  async initialize() {
+    await this._executor.initialize();
+  }
+
   get connectionFactory(): ConnectionFactory {
     return this._connectionFactory;
   }
@@ -36,6 +40,6 @@ class ProxyConnectionFactory implements ConnectionFactory {
 
   create(clock: nt.ClockWithOffset): nt.ProxyConnection {
     this.clockHandler(clock);
-    return new nt.ProxyConnection(clock, this.transport);
+    return new nt.ProxyConnection(this.transport);
   }
 }

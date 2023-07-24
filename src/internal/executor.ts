@@ -3,6 +3,7 @@ import { Address, FullContractState } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
 import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
+import {BlockchainConfig} from "nekoton-wasm";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => (a.lt || 0) - (b.lt || 0);
 
@@ -20,7 +21,7 @@ type ExecutorState = {
 };
 
 interface LockliftTransport {
-  getBlockchainConfig(): string[];
+  getBlockchainConfig(): Promise<BlockchainConfig>;
   setExecutor(executor: LockliftExecutor): void;
 }
 
@@ -28,14 +29,11 @@ export class LockliftExecutor {
   private state: ExecutorState;
   private snapshots: { [id: string]: ExecutorState } = {};
   private nonce = 0;
-  private readonly blockchainConfig: string;
-  private readonly globalId: number;
+  private blockchainConfig: string | undefined;
+  private globalId: number | undefined;
   private clock: nt.ClockWithOffset | undefined;
 
   constructor(private readonly transport: LockliftTransport) {
-    const config = transport.getBlockchainConfig();
-    this.blockchainConfig = config[0];
-    this.globalId = Number(config[1]);
     this.state = {
       accounts: {},
       transactions: {},
@@ -56,6 +54,13 @@ export class LockliftExecutor {
 
     transport.setExecutor(this);
   }
+
+  async initialize() {
+    const config = await this.transport.getBlockchainConfig();
+    this.blockchainConfig = config.boc;
+    this.globalId = Number(config.globalId);
+  }
+
 
   setClock(clock: nt.ClockWithOffset) {
     if (this.clock !== undefined) throw new Error("Clock already set");
@@ -137,7 +142,8 @@ export class LockliftExecutor {
     if (!message) return;
     const receiverAcc = this.getAccount(message.dst as string);
     let res: nt.TransactionExecutorExtendedOutput = nt.executeLocalExtended(
-      this.blockchainConfig,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      this.blockchainConfig!,
       receiverAcc ? nt.makeFullAccountBoc(receiverAcc.boc) : EMPTY_STATE,
       message.boc,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -150,7 +156,8 @@ export class LockliftExecutor {
     if ("account" in res && res.transaction.description.aborted) {
       // run 1 more time with trace on
       res = nt.executeLocalExtended(
-        this.blockchainConfig,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        this.blockchainConfig!,
         receiverAcc ? nt.makeFullAccountBoc(receiverAcc.boc) : EMPTY_STATE,
         message.boc,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

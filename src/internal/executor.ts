@@ -165,7 +165,7 @@ export class LockliftExecutor {
       this.setAccount(message.dst as string, res.account);
       this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {
-        if (msg.dst === undefined) return; // event
+        if (msg.msgType === "ExtOut") return;  // event
         this.enqueueMsg(msg);
       });
     }

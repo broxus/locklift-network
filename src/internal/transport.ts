@@ -25,6 +25,7 @@ export class LockliftTransport implements nt.IProxyConnector {
     const q = Object.entries(this.executor!.getAccounts())
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .filter(([_, state]) => state.codeHash === codeHash)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .map(([address, _]) => address);
     return Promise.resolve(q);
   }
@@ -55,7 +56,7 @@ export class LockliftTransport implements nt.IProxyConnector {
   getContractState(address: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const state = this.executor!.getAccount(address);
-    return Promise.resolve(state?.boc == null ? EMPTY_STATE : state.boc);
+    return Promise.resolve(state?.boc == null ? EMPTY_STATE : nt.makeFullAccountBoc(state.boc));
   }
 
   getDstTransaction(msgHash: string): Promise<string | undefined> {

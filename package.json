@@ -1,6 +1,6 @@
 {
   "name": "@broxus/locklift-network",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "In-memory TVM-blockchain emulator for locklift",
   "keywords": [
     "Everscale",
@@ -42,7 +42,7 @@
     "lodash": "^4.17.21",
     "everscale-inpage-provider": "^0.3.61",
     "everscale-standalone-client": "^2.1.21",
-    "nekoton-wasm": "npm:nekoton-wasm-extended@^1.2.0",
+    "nekoton-wasm": "npm:nekoton-wasm-extended@^2.0.0",
     "typescript": "^4.7.4"
   },
   "devDependencies": {

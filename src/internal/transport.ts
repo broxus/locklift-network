@@ -41,16 +41,14 @@ export class LockliftTransport implements nt.IProxyConnector {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getCapabilities(nowMs: string): Promise<NetworkCapabilities> {
     const config = await this.getBlockchainConfig();
-    return new Promise<NetworkCapabilities>(() => {
-      if (this.cache["capabilities"] === undefined) {
-        const cap = nt.getCapabilitiesFromConfig(config.boc);
-        this.cache["capabilities"] = {
-          globalId: config.globalId,
-          capabilities: cap.toString()
-        };
-      }
-      return this.cache["capabilities"];
-    });
+    if (this.cache["capabilities"] == null) {
+      const cap = nt.getCapabilitiesFromConfig(config.boc);
+      this.cache["capabilities"] = {
+        globalId: config.globalId,
+        raw: Number(cap)
+      };
+    }
+    return Promise.resolve(this.cache["capabilities"]);
   }
 
   getContractState(address: string): Promise<string> {

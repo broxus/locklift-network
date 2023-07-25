@@ -1,10 +1,7 @@
 {
   "name": "@broxus/locklift-network",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "In-memory TVM-blockchain emulator for locklift",
-  "directories": {
-    "example": "examples"
-  },
   "keywords": [
     "Everscale",
     "TON",

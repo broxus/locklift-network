@@ -3,7 +3,7 @@ import { Address, FullContractState } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
 import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
-import {BlockchainConfig} from "nekoton-wasm";
+import { BlockchainConfig } from "nekoton-wasm";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => (a.lt || 0) - (b.lt || 0);
 
@@ -61,7 +61,6 @@ export class LockliftExecutor {
     this.globalId = Number(config.globalId);
   }
 
-
   setClock(clock: nt.ClockWithOffset) {
     if (this.clock !== undefined) throw new Error("Clock already set");
     this.clock = clock;
@@ -102,7 +101,7 @@ export class LockliftExecutor {
 
   getTransactions(address: Address | string, fromLt: string, count: number): nt.JsRawTransaction[] {
     const result: nt.JsRawTransaction[] = [];
-    for (const txId of (this.state.addrToTransactions[address.toString()] || [])) {
+    for (const txId of this.state.addrToTransactions[address.toString()] || []) {
       const rawTx = this.state.transactions[txId];
       if (Number(rawTx.lt) > Number(fromLt)) continue;
       result.push(rawTx);
@@ -172,7 +171,7 @@ export class LockliftExecutor {
       this.setAccount(message.dst as string, res.account);
       this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {
-        if (msg.msgType === "ExtOut") return;  // event
+        if (msg.msgType === "ExtOut") return; // event
         this.enqueueMsg(msg);
       });
     }

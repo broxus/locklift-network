@@ -1,7 +1,7 @@
 import * as nt from "nekoton-wasm";
-import {LockliftExecutor} from "./executor";
-import {EMPTY_STATE, MAIN_CONFIG} from "./constants";
-import {BlockchainConfig, NetworkCapabilities} from "nekoton-wasm";
+import { LockliftExecutor } from "./executor";
+import { EMPTY_STATE, MAIN_CONFIG } from "./constants";
+import { BlockchainConfig, NetworkCapabilities } from "nekoton-wasm";
 
 export class LockliftTransport implements nt.IProxyConnector {
   private executor: LockliftExecutor | undefined;
@@ -15,7 +15,7 @@ export class LockliftTransport implements nt.IProxyConnector {
     return {
       hasKeyBlocks: false,
       maxTransactionsPerFetch: 255,
-      reliableBehavior: "IntensivePolling"
+      reliableBehavior: "IntensivePolling",
     };
   }
 
@@ -34,7 +34,7 @@ export class LockliftTransport implements nt.IProxyConnector {
   getBlockchainConfig(): Promise<BlockchainConfig> {
     return Promise.resolve({
       boc: MAIN_CONFIG,
-      globalId: 42
+      globalId: 42,
     });
   }
 
@@ -45,7 +45,7 @@ export class LockliftTransport implements nt.IProxyConnector {
       const cap = nt.getCapabilitiesFromConfig(config.boc);
       this.cache["capabilities"] = {
         globalId: config.globalId,
-        raw: Number(cap)
+        raw: Number(cap),
       };
     }
     return Promise.resolve(this.cache["capabilities"]);

@@ -45,7 +45,7 @@
     "lodash": "^4.17.21",
     "everscale-inpage-provider": "^0.3.61",
     "everscale-standalone-client": "^2.1.21",
-    "nekoton-wasm": "file:../nekoton-wasm/pkg",
+    "nekoton-wasm": "npm:nekoton-wasm-extended@^1.2.0",
     "typescript": "^4.7.4"
   },
   "devDependencies": {

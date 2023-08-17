@@ -149,6 +149,7 @@ export class LockliftExecutor {
       Math.floor(this.clock!.nowMs / 1000),
       false,
       undefined,
+      undefined,
       this.globalId,
       false,
     );
@@ -163,10 +164,12 @@ export class LockliftExecutor {
         Math.floor(this.clock!.nowMs / 1000),
         false,
         undefined,
+        undefined,
         this.globalId,
         true,
       );
     }
+
     if ("account" in res) {
       this.setAccount(message.dst as string, res.account);
       this.saveTransaction(res.transaction, res.trace);

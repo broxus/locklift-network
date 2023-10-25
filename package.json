@@ -42,7 +42,7 @@
     "lodash": "^4.17.21",
     "everscale-inpage-provider": "^0.3.61",
     "everscale-standalone-client": "^2.1.21",
-    "nekoton-wasm": "npm:nekoton-wasm-locklift@^1.20.2",
+    "nekoton-wasm": "O:\\projects\\broxus\\ever-locklift\\node_modules\\nekoton-wasm",
     "typescript": "^4.7.4"
   },
   "devDependencies": {
@@ -56,4 +56,5 @@
     "prettier": "^2.7.1",
     "husky": "^8.0.0"
   }
+
 }

@@ -51,9 +51,10 @@ export class LockliftTransport implements nt.IProxyConnector {
     return Promise.resolve(this.cache["capabilities"]);
   }
 
-  getContractState(address: string): Promise<string> {
+  async getContractState(address: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const state = this.executor!.getAccount(address);
+    const state = await this.executor!.getAccount(address);
+
     return Promise.resolve(state?.boc == null ? EMPTY_STATE : nt.makeFullAccountBoc(state.boc));
   }
 
@@ -76,11 +77,11 @@ export class LockliftTransport implements nt.IProxyConnector {
     return Promise.resolve(this.executor!.getTransactions(address, fromLt, count).map(tx => tx.boc));
   }
 
-  sendMessage(message: string): Promise<void> {
+  async sendMessage(message: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.executor!.enqueueMsg(nt.parseMessageBase64Extended(message));
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.executor!.processQueue();
+    await this.executor!.processQueue();
     return Promise.resolve();
   }
 }

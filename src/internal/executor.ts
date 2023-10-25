@@ -4,6 +4,7 @@ import { Heap } from "heap-js";
 import _ from "lodash";
 import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
 import { BlockchainConfig } from "nekoton-wasm";
+import { AccountFetcherCallback } from "../types";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => (a.lt || 0) - (b.lt || 0);
 
@@ -33,7 +34,10 @@ export class LockliftExecutor {
   private globalId: number | undefined;
   private clock: nt.ClockWithOffset | undefined;
 
-  constructor(private readonly transport: LockliftTransport) {
+  constructor(
+    private readonly transport: LockliftTransport,
+    private readonly accountFetcherCallback?: AccountFetcherCallback,
+  ) {
     this.state = {
       accounts: {},
       transactions: {},
@@ -66,12 +70,30 @@ export class LockliftExecutor {
     this.clock = clock;
   }
 
-  private setAccount(address: Address | string, boc: string) {
+  _setAccount(address: Address | string, boc: string) {
     this.state.accounts[address.toString()] = nt.parseFullAccountBoc(boc) as nt.FullContractState;
   }
+  setAccount(address: Address | string, boc: string, type: "accountStuffBoc" | "fullAccountBoc") {
+    this.state.accounts[address.toString()] = nt.parseFullAccountBoc(
+      type === "accountStuffBoc" ? nt.makeFullAccountBoc(boc) : boc,
+    ) as nt.FullContractState;
+  }
 
-  getAccount(address: Address | string): FullContractState | undefined {
-    return this.state.accounts[address.toString()];
+  async getAccount(address: Address | string): Promise<FullContractState | undefined> {
+    return (
+      this.state.accounts[address.toString()] ||
+      this.accountFetcherCallback?.(address instanceof Address ? address : new Address(address))
+        .then(({ boc, type }) => {
+          if (!boc) throw new Error("Account not found");
+          this.setAccount(address, boc, type);
+          return this.state.accounts[address.toString()];
+        })
+        .catch(e => {
+          debugger;
+          console.error(`Failed to fetch account ${address.toString()}: ${e.trace}`);
+          return undefined;
+        })
+    );
   }
 
   getAccounts(): { [id: string]: FullContractState } {
@@ -128,18 +150,19 @@ export class LockliftExecutor {
   }
 
   // process all msgs in queue
-  processQueue() {
+  async processQueue() {
     while (this.state.messageQueue.size() > 0) {
-      this.processNextMsg();
+      await this.processNextMsg();
     }
   }
 
   // process msg with lowest lt in queue
-  processNextMsg() {
+  async processNextMsg() {
     const message = this.state.messageQueue.pop() as nt.JsRawMessage;
     // everything is processed
     if (!message) return;
-    const receiverAcc = this.getAccount(message.dst as string);
+    const receiverAcc = await this.getAccount(message.dst as string);
+
     let res: nt.TransactionExecutorExtendedOutput = nt.executeLocalExtended(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       this.blockchainConfig!,
@@ -171,7 +194,7 @@ export class LockliftExecutor {
     }
 
     if ("account" in res) {
-      this.setAccount(message.dst as string, res.account);
+      this._setAccount(message.dst as string, res.account);
       this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {
         if (msg.msgType === "ExtOut") return; // event

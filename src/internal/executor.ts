@@ -89,7 +89,6 @@ export class LockliftExecutor {
           return this.state.accounts[address.toString()];
         })
         .catch(e => {
-          debugger;
           console.error(`Failed to fetch account ${address.toString()}: ${e.trace}`);
           return undefined;
         })

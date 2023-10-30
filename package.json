@@ -17,6 +17,7 @@
   "files": [
     "internal/",
     "src/",
+    "types/",
     "README.md",
     "*.d.ts",
     "*.d.ts.map",

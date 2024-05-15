@@ -1,6 +1,6 @@
 import * as nt from "nekoton-wasm";
 import { LockliftExecutor } from "./executor";
-import { EMPTY_STATE, MAIN_CONFIG } from "./constants";
+import { EMPTY_STATE, MAIN_CONFIG, TON_CONFIG } from "./constants";
 import { BlockchainConfig, NetworkCapabilities } from "nekoton-wasm";
 
 export class LockliftTransport implements nt.IProxyConnector {
@@ -33,7 +33,7 @@ export class LockliftTransport implements nt.IProxyConnector {
   // @ts-ignore
   getBlockchainConfig(): Promise<BlockchainConfig> {
     return Promise.resolve({
-      boc: MAIN_CONFIG,
+      boc: TON_CONFIG,
       globalId: 42,
     });
   }

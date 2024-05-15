@@ -27,7 +27,7 @@ interface LockliftTransport {
 }
 
 export class LockliftExecutor {
-  private state: ExecutorState;
+  private state: ExecutorState = {} as ExecutorState;
   private snapshots: { [id: string]: ExecutorState } = {};
   private nonce = 0;
   private blockchainConfig: string | undefined;
@@ -38,6 +38,11 @@ export class LockliftExecutor {
     private readonly transport: LockliftTransport,
     private readonly accountFetcherCallback?: AccountFetcherCallback,
   ) {
+    this.createInitialBlockchainState();
+    transport.setExecutor(this);
+  }
+
+  private createInitialBlockchainState() {
     this.state = {
       accounts: {},
       transactions: {},
@@ -46,7 +51,7 @@ export class LockliftExecutor {
       traces: {},
       messageQueue: new Heap<nt.JsRawMessage>(messageComparator),
     };
-    // set this in order to pass standalone-client checks
+
     this.state.accounts[ZERO_ADDRESS.toString()] = nt.parseFullAccountBoc(
       nt.makeFullAccountBoc(GIVER_BOC),
     ) as nt.FullContractState;
@@ -55,8 +60,6 @@ export class LockliftExecutor {
     this.state.accounts[GIVER_ADDRESS] = nt.parseFullAccountBoc(
       nt.makeFullAccountBoc(GIVER_BOC),
     ) as nt.FullContractState;
-
-    transport.setExecutor(this);
   }
 
   async initialize() {
@@ -146,6 +149,10 @@ export class LockliftExecutor {
 
   clearSnapshots() {
     this.snapshots = {};
+  }
+
+  resetBlockchainState() {
+    this.createInitialBlockchainState();
   }
 
   // process all msgs in queue

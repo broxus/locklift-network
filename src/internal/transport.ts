@@ -6,6 +6,21 @@ import { BlockchainConfig, NetworkCapabilities } from "nekoton-wasm";
 export class LockliftTransport implements nt.IProxyConnector {
   private executor: LockliftExecutor | undefined;
   private cache: { [id: string]: any } = {};
+  private readonly networkConfig: string;
+  constructor(networkConfig: "EVER" | "TON" | { custom: string } | undefined) {
+    if (typeof networkConfig === "object") {
+      this.networkConfig = networkConfig.custom;
+      console.log("Locklift network is using custom blockchain config");
+      return;
+    }
+    if (networkConfig === "TON") {
+      this.networkConfig = TON_CONFIG;
+      console.log("Locklift network is using TON blockchain config");
+      return;
+    }
+    this.networkConfig = MAIN_CONFIG;
+    console.log("Locklift network is using EVER blockchain");
+  }
 
   setExecutor(executor: LockliftExecutor): void {
     this.executor = executor;
@@ -33,7 +48,7 @@ export class LockliftTransport implements nt.IProxyConnector {
   // @ts-ignore
   getBlockchainConfig(): Promise<BlockchainConfig> {
     return Promise.resolve({
-      boc: TON_CONFIG,
+      boc: this.networkConfig,
       globalId: 42,
     });
   }

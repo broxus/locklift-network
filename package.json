@@ -41,8 +41,8 @@
   "dependencies": {
     "heap-js": "2.3.0",
     "lodash": "^4.17.21",
-    "everscale-inpage-provider": "^0.3.61",
-    "everscale-standalone-client": "^2.1.21",
+    "everscale-inpage-provider": "^0.3.64",
+    "everscale-standalone-client": "^2.1.26",
     "nekoton-wasm": "O:\\projects\\broxus\\ever-locklift\\node_modules\\nekoton-wasm",
     "typescript": "^4.7.4"
   },

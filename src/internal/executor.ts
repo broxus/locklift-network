@@ -1,12 +1,12 @@
 import * as nt from "nekoton-wasm";
-import { Address, FullContractState } from "everscale-inpage-provider";
+import { Address, FullContractState, LT_COLLATOR } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
 import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
 import { BlockchainConfig } from "nekoton-wasm";
 import { AccountFetcherCallback } from "../types";
 
-const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => (a.lt || 0) - (b.lt || 0);
+const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => LT_COLLATOR.compare(a.lt || "0", b.lt || "0");
 
 type ExecutorState = {
   accounts: { [id: string]: FullContractState };
@@ -51,7 +51,7 @@ export class LockliftExecutor {
       traces: {},
       messageQueue: new Heap<nt.JsRawMessage>(messageComparator),
     };
-
+    // set this in order to pass standalone-client checks
     this.state.accounts[ZERO_ADDRESS.toString()] = nt.parseFullAccountBoc(
       nt.makeFullAccountBoc(GIVER_BOC),
     ) as nt.FullContractState;

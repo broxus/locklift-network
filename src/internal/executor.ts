@@ -2,14 +2,22 @@ import * as nt from "nekoton-wasm";
 import { Address, FullContractState, LT_COLLATOR } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
-import { EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
+import { defaultConfig, EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
 import { BlockchainConfig } from "nekoton-wasm";
 import { AccountFetcherCallback } from "../types";
+import { TychoExecutor } from "@tychosdk/emulator";
+import { Account, beginCell, Cell, loadAccount, loadShardAccount, storeAccount, storeShardAccount } from "@ton/core";
+import type { ExecutorEmulationResult } from "@ton/sandbox";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => LT_COLLATOR.compare(a.lt || "0", b.lt || "0");
-
+export interface FullContractStateCut {
+  boc: string;
+  balance?: string;
+  isDeployed: boolean;
+  codeHash?: string;
+}
 type ExecutorState = {
-  accounts: { [id: string]: FullContractState };
+  accounts: { [id: string]: nt.FullContractState };
   // txId -> tx
   transactions: { [id: string]: nt.JsRawTransaction };
   // txId -> trace
@@ -30,9 +38,10 @@ export class LockliftExecutor {
   private state: ExecutorState = {} as ExecutorState;
   private snapshots: { [id: string]: ExecutorState } = {};
   private nonce = 0;
-  private blockchainConfig: string | undefined;
+  private blockchainConfig!: string;
   private globalId: number | undefined;
   private clock: nt.ClockWithOffset | undefined;
+  private tychoExecutor!: TychoExecutor;
 
   constructor(
     private readonly transport: LockliftTransport,
@@ -66,6 +75,7 @@ export class LockliftExecutor {
     const config = await this.transport.getBlockchainConfig();
     this.blockchainConfig = config.boc;
     this.globalId = Number(config.globalId);
+    this.tychoExecutor = await TychoExecutor.create();
   }
 
   setClock(clock: nt.ClockWithOffset) {
@@ -76,13 +86,16 @@ export class LockliftExecutor {
   _setAccount(address: Address | string, boc: string) {
     this.state.accounts[address.toString()] = nt.parseFullAccountBoc(boc) as nt.FullContractState;
   }
+  _setAccount1(address: Address | string, fullContractState: nt.FullContractState) {
+    this.state.accounts[address.toString()] = fullContractState;
+  }
   setAccount(address: Address | string, boc: string, type: "accountStuffBoc" | "fullAccountBoc") {
     this.state.accounts[address.toString()] = nt.parseFullAccountBoc(
       type === "accountStuffBoc" ? nt.makeFullAccountBoc(boc) : boc,
     ) as nt.FullContractState;
   }
 
-  async getAccount(address: Address | string): Promise<FullContractState | undefined> {
+  async getAccount(address: Address | string): Promise<nt.FullContractState | undefined> {
     return (
       this.state.accounts[address.toString()] ||
       this.accountFetcherCallback?.(address instanceof Address ? address : new Address(address))
@@ -98,7 +111,7 @@ export class LockliftExecutor {
     );
   }
 
-  getAccounts(): { [id: string]: FullContractState } {
+  getAccounts(): { [id: string]: FullContractStateCut } {
     return this.state.accounts;
   }
 
@@ -162,8 +175,8 @@ export class LockliftExecutor {
     }
   }
 
-  // process msg with lowest lt in queue
-  async processNextMsg() {
+  // // process msg with lowest lt in queue
+  async processNextMsg_old() {
     const message = this.state.messageQueue.pop() as nt.JsRawMessage;
     // everything is processed
     if (!message) return;
@@ -198,11 +211,89 @@ export class LockliftExecutor {
         true,
       );
     }
-
+    debugger;
     if ("account" in res) {
       this._setAccount(message.dst as string, res.account);
       this.saveTransaction(res.transaction, res.trace);
       res.transaction.outMessages.map((msg: nt.JsRawMessage) => {
+        if (msg.msgType === "ExtOut") return; // event
+        this.enqueueMsg(msg);
+      });
+    }
+  }
+
+  // process msg with lowest lt in queue
+  async processNextMsg() {
+    const message = this.state.messageQueue.pop() as nt.JsRawMessage;
+    // everything is processed
+    if (!message) return;
+    const receiverAcc = await this.getAccount(message.dst as string);
+    const messageCell = Cell.fromBase64(message.boc);
+    const acc = receiverAcc ? loadAccount(Cell.fromBase64(receiverAcc.boc).beginParse()) : null;
+    const now = Math.floor(this.clock!.nowMs / 1000);
+    const shardAcc = storeShardAccount({
+      account: acc,
+      lastTransactionHash: BigInt(receiverAcc?.lastTransactionId?.hash || "0"),
+      lastTransactionLt: acc?.storage.lastTransLt || 0n,
+    });
+
+    let res: ExecutorEmulationResult = await this.tychoExecutor.runTransaction({
+      config: defaultConfig,
+      message: messageCell,
+      lt: (acc?.storage.lastTransLt || 0n) + 10n,
+      shardAccount: beginCell().store(shardAcc).endCell().toBoc().toString("base64"),
+      now,
+      libs: null,
+      debugEnabled: true,
+      randomSeed: null,
+      verbosity: "full_location_stack_verbose",
+      ignoreChksig: true,
+    });
+    // if ("account" in res && res.account) {
+    //   // run 1 more time with trace on
+    //   res = nt.executeLocalExtended(
+    //     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    //     this.blockchainConfig!,
+    //     receiverAcc ? nt.makeFullAccountBoc(receiverAcc.boc) : EMPTY_STATE,
+    //     message.boc,
+    //     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    //     Math.floor(this.clock!.nowMs / 1000),
+    //     false,
+    //     undefined,
+    //     undefined,
+    //     this.globalId,
+    //     true,
+    //   );
+    // }
+    if (res.result.success && res.result.shardAccount) {
+      const shardAccount = loadShardAccount(Cell.fromBase64(res.result.shardAccount).beginParse());
+      const b = beginCell();
+      storeAccount(shardAccount.account as Account)(b);
+      const accountBoc = b.endCell().toBoc().toString("base64");
+      const decodedTx = nt.decodeRawTransaction(res.result.transaction);
+
+      const fullContractState: nt.FullContractState = {
+        balance: shardAccount.account?.storage?.balance.coins?.toString() || "0",
+        genTimings: {
+          genLt: shardAccount.lastTransactionLt.toString(),
+          genUtime: now,
+        },
+        lastTransactionId: {
+          lt: shardAccount.account?.storage.lastTransLt.toString() || "0",
+          hash: shardAccount.lastTransactionHash.toString(),
+          isExact: true,
+        },
+        isDeployed: shardAccount.account?.storage.state.type === "active",
+        codeHash:
+          shardAccount.account?.storage.state.type === "active"
+            ? shardAccount.account.storage.state.state.code?.hash().toString("hex")
+            : undefined,
+        boc: accountBoc,
+      };
+
+      this._setAccount1(message.dst as string, fullContractState);
+      this.saveTransaction(decodedTx, []);
+      decodedTx.outMessages.map((msg: nt.JsRawMessage) => {
         if (msg.msgType === "ExtOut") return; // event
         this.enqueueMsg(msg);
       });

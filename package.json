@@ -43,7 +43,7 @@
     "@ton/crypto": "^3.3.0",
     "@ton/sandbox": "^0.30.0",
     "@ton/ton": "^15.2.1",
-    "@tychosdk/emulator": "^0.1.13",
+    "@tychosdk/emulator": "^0.1.15",
     "everscale-inpage-provider": "^0.6.1",
     "everscale-standalone-client": "^2.2.0",
     "heap-js": "2.3.0",

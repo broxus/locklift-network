@@ -61,5 +61,6 @@
     "eslint-plugin-prettier": "^4.2.1",
     "husky": "^8.0.0",
     "prettier": "^2.7.1"
+
   }
 }

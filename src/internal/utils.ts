@@ -1,8 +1,8 @@
 import * as nt from "nekoton-wasm";
-import { Account, beginCell, Cell, loadAccount, ShardAccount, storeAccount } from "@ton/core";
+import { Account, beginCell, Cell, loadAccount, ShardAccount, storeAccount, storeShardAccount } from "@ton/core";
+import { GIVER_BOC } from "./constants";
 export const parseBlocks = (input: string): Array<nt.EngineTraceInfo> => {
   const blocks = input.trim().split(/(?=stack: \[)/); // разбиваем на блоки
-
   return blocks.map((block, idx) => {
     const stackMatch = block.match(/stack:\s*\[(.*?)\]/s);
     const stack = stackMatch ? stackMatch[1].trim().split(/\s+/) : [];
@@ -40,30 +40,6 @@ export const shardAccountFromBoc = (boc: string, lastTxLt?: bigint): ShardAccoun
   };
 };
 
-export const fullContractStateFromShardAccount = (shardAccount: ShardAccount): nt.FullContractState => {
-  const b = beginCell();
-  storeAccount(shardAccount.account as Account)(b);
-
-  const accountBoc = nt.makeFullAccountBoc(b.endCell().toBoc().toString("base64"));
-
-  return {
-    balance: shardAccount.account?.storage?.balance.coins?.toString() || "0",
-    genTimings: {
-      // genLt: shardAccount.account?.storage.lastTransLt.toString() || "0",
-      genLt: "0",
-      genUtime: 0,
-    },
-    lastTransactionId: {
-      lt: shardAccount.lastTransactionLt.toString(),
-
-      hash: shardAccount.lastTransactionHash.toString(),
-      isExact: false,
-    },
-    isDeployed: shardAccount.account?.storage.state.type === "active",
-    codeHash:
-      shardAccount.account?.storage.state.type === "active"
-        ? shardAccount.account.storage.state.state.code?.hash().toString("hex")
-        : undefined,
-    boc: accountBoc,
-  };
+export const bocFromShardAccount = (shardAccount: ShardAccount): string => {
+  return beginCell().store(storeShardAccount(shardAccount)).endCell().toBoc().toString("base64");
 };

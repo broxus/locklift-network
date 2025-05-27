@@ -1,14 +1,13 @@
 import * as nt from "nekoton-wasm";
 import { LockliftExecutor } from "./executor";
-import { EMPTY_STATE, MAIN_CONFIG, TEST_CODE_HASH, TON_CONFIG, ZERO_ADDRESS } from "./constants";
+import { EMPTY_STATE, EVER_MAIN_CONFIG, TEST_CODE_HASH, TON_CONFIG, TYCHO_CONFIG, ZERO_ADDRESS } from "./constants";
 import { BlockchainConfig, NetworkCapabilities } from "nekoton-wasm";
-import { fullContractStateFromShardAccount } from "./utils";
 
 export class LockliftTransport implements nt.IProxyConnector {
   private executor: LockliftExecutor | undefined;
   private cache: { [id: string]: any } = {};
   private readonly networkConfig: string;
-  constructor(networkConfig: "EVER" | "TON" | { custom: string } | undefined) {
+  constructor(networkConfig: "EVER" | "TON" | "TYCHO-TESTNET" | { custom: string } | undefined) {
     if (typeof networkConfig === "object") {
       this.networkConfig = networkConfig.custom;
       console.log("Locklift network is using custom blockchain config");
@@ -19,8 +18,17 @@ export class LockliftTransport implements nt.IProxyConnector {
       console.log("Locklift network is using TON blockchain config");
       return;
     }
-    this.networkConfig = MAIN_CONFIG;
-    console.log("Locklift network is using EVER blockchain");
+    if (networkConfig === "EVER") {
+      this.networkConfig = EVER_MAIN_CONFIG;
+      console.log("Locklift network is using TYCHO blockchain config");
+      return;
+    }
+    this.networkConfig = TYCHO_CONFIG;
+    console.log("Locklift network is using TYCHO-TESTNET blockchain");
+  }
+
+  getLibraryCell(hash: string): Promise<string | undefined> {
+    throw new Error("Method not implemented.");
   }
 
   setExecutor(executor: LockliftExecutor): void {
@@ -69,10 +77,8 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   async getContractState(address: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const state = await this.executor!._getAccount(address);
-
-    return !state ? EMPTY_STATE : fullContractStateFromShardAccount(state).boc;
+    return state ? nt.parseShardAccountBoc(state)?.boc || EMPTY_STATE : EMPTY_STATE;
   }
 
   getDstTransaction(msgHash: string): Promise<string | undefined> {

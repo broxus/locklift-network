@@ -44,10 +44,6 @@ export class LockliftNetwork {
   getBlockchainConfig(): Promise<BlockchainConfig> {
     return this._transport.getBlockchainConfig();
   }
-
-  getTxTrace(txHash: string): nt.EngineTraceInfo[] | undefined {
-    return this._executor.getTxTrace(txHash);
-  }
 }
 
 class ProxyConnectionFactory implements ConnectionFactory {

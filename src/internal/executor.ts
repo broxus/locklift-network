@@ -3,12 +3,12 @@ import { BlockchainConfig } from "nekoton-wasm";
 import { Address, LT_COLLATOR } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
-import { defaultConfig, EMPTY_STATE, GIVER_ADDRESS, GIVER_BOC, TEST_CODE_HASH, ZERO_ADDRESS } from "./constants";
+import { GIVER_ADDRESS, GIVER_BOC, ZERO_ADDRESS } from "./constants";
 import { AccountFetcherCallback } from "../types";
 import { TychoExecutor } from "@tychosdk/emulator";
-import { beginCell, Cell, loadShardAccount, ShardAccount, storeShardAccount } from "@ton/core";
+import { beginCell, Cell, storeShardAccount } from "@ton/core";
 import type { ExecutorEmulationResult } from "@ton/sandbox";
-import { shardAccountFromBoc, parseBlocks, bocFromShardAccount } from "./utils";
+import { bocFromShardAccount, parseBlocks, shardAccountFromBoc } from "./utils";
 
 const messageComparator = (a: nt.JsRawMessage, b: nt.JsRawMessage) => LT_COLLATOR.compare(a.lt || "0", b.lt || "0");
 const emptyShardAccount = beginCell()
@@ -50,7 +50,6 @@ export class LockliftExecutor {
   private clock: nt.ClockWithOffset | undefined;
   private tychoExecutor!: TychoExecutor;
   blockchainLt = 1000n;
-  totalExecutionTime = 0;
 
   constructor(
     private readonly transport: LockliftTransport,
@@ -104,28 +103,6 @@ export class LockliftExecutor {
     this.state.accounts[address.toString()] = bocFromShardAccount(shardAccountFromBoc(fullContractState.boc));
   }
 
-  async getAccount(address: Address | string): Promise<nt.FullContractState | undefined> {
-    debugger;
-    const shardAccount = this.state.accounts[address.toString()];
-    //   ? shardAccountFromBoc(this.state.accounts[address.toString()])
-    //   : undefined;
-    // if (!shardAccount || !shardAccount.account) {
-    //   return;
-    // }
-    return nt.parseShardAccountBoc(shardAccount);
-    // ||
-    // this.accountFetcherCallback?.(address instanceof Address ? address : new Address(address))
-    //   .then(({ boc, type }) => {
-    //     if (!boc) throw new Error("Account not found");
-    //     this.setAccount(address, boc, type);
-    //     return this.state.accounts[address.toString()];
-    //   })
-    //   .catch(e => {
-    //     console.error(`Failed to fetch account ${address.toString()}: ${e.trace}`);
-    //     return undefined;
-    //   })
-  }
-
   async _getAccount(address: Address | string): Promise<string | undefined> {
     return this.state.accounts[address.toString()];
     // ||
@@ -141,30 +118,16 @@ export class LockliftExecutor {
     //   })
   }
 
-  // getAccounts(): Record<string, nt.FullContractState> {
-  //   const res = Object.entries(this.state.accounts).reduce((acc, next) => {
-  //     const [address, account] = next;
-  //     const shardAccount = shardAccountFromBoc(account);
-  //     if (shardAccount.account === null) return acc;
-  //     acc[address] = fullContractStateFromShardAccount(shardAccount);
-  //     return acc;
-  //   }, {} as Record<string, nt.FullContractState>);
-  //
-  //   return res;
-  // }
-
   getAccounts(): Record<string, nt.FullContractState> {
-    debugger;
-
-    const res = Object.entries(this.state.accounts).reduce((acc, next) => {
+    return Object.entries(this.state.accounts).reduce((acc, next) => {
       const [address, account] = next;
       const fullContractState = nt.parseShardAccountBoc(account);
-      if (!fullContractState) return acc;
+      if (!fullContractState) {
+        return acc;
+      }
       acc[address] = fullContractState;
       return acc;
     }, {} as Record<string, nt.FullContractState>);
-
-    return res;
   }
 
   getTxTrace(txId: string): nt.EngineTraceInfo[] | undefined {
@@ -257,6 +220,7 @@ export class LockliftExecutor {
       console.log("Error in executor: ", res.result.error);
       return;
     }
+
     const decodedTx = nt.decodeRawTransaction(res.result.transaction);
     let trace: Array<nt.EngineTraceInfo> = [];
     if (decodedTx.description.aborted) {
@@ -280,7 +244,7 @@ export class LockliftExecutor {
     }
 
     if (res.logs || res.debugLogs) {
-      console.log("debugLogs: ", res.debugLogs);
+      console.log("Debug logs: ", res.debugLogs);
     }
 
     if (!res.result.success) {
@@ -297,8 +261,6 @@ export class LockliftExecutor {
         this.enqueueMsg(msg);
       });
     }
-    this.totalExecutionTime += Date.now() - startTime;
-    console.log(`Total  execution time: ${this.totalExecutionTime} ms`);
   }
 
   // push new message to queue

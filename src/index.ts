@@ -1,9 +1,9 @@
 import * as nt from "nekoton-wasm";
-import { ConnectionFactory } from "everscale-standalone-client/nodejs";
 import { LockliftExecutor } from "./internal/executor";
 import { LockliftTransport } from "./internal/transport";
 import { AccountFetcherCallback } from "./types";
 import { BlockchainConfig } from "nekoton-wasm";
+import { ConnectionFactory } from "everscale-standalone-client";
 
 export class LockliftNetwork {
   private readonly _transport: LockliftTransport;

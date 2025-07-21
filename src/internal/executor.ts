@@ -6,7 +6,7 @@ import _ from "lodash";
 import { GIVER_ADDRESS, GIVER_BOC, ZERO_ADDRESS } from "./constants";
 import { AccountFetcherCallback } from "../types";
 import { TychoExecutor } from "@tychosdk/emulator";
-import { beginCell, Cell, storeShardAccount } from "@ton/core";
+import { beginCell, Cell, storeShardAccount, loadShardAccount, Dictionary } from "@ton/core";
 import type { ExecutorEmulationResult } from "@ton/sandbox";
 import { bocFromShardAccount, parseBlocks, shardAccountFromBoc } from "./utils";
 
@@ -34,6 +34,7 @@ type ExecutorState = {
   // address -> tx_ids
   addrToTransactions: { [addr: string]: string[] };
   messageQueue: Heap<nt.JsRawMessage>;
+  libs: Dictionary<bigint, Cell>;
 };
 
 interface LockliftTransport {
@@ -67,6 +68,7 @@ export class LockliftExecutor {
       addrToTransactions: {},
       traces: {},
       messageQueue: new Heap<nt.JsRawMessage>(messageComparator),
+      libs: Dictionary.empty(Dictionary.Keys.BigInt(256), Dictionary.Values.Cell()),
     };
     // set this in order to pass standalone-client checks
 
@@ -94,6 +96,10 @@ export class LockliftExecutor {
 
   _setAccount1(address: Address | string, boc: string) {
     this.state.accounts[address.toString()] = boc;
+  }
+
+  _setLibrary(key: bigint, cell: Cell) {
+    this.state.libs.set(key, cell);
   }
 
   setAccount(address: Address | string, boc: string, type: "accountStuffBoc" | "fullAccountBoc") {
@@ -192,8 +198,6 @@ export class LockliftExecutor {
 
   // process msg with lowest lt in queue
   async processNextMsg() {
-    const startTime = Date.now();
-
     const message = this.state.messageQueue.pop() as nt.JsRawMessage;
     // everything is processed
     if (!message) return;
@@ -209,7 +213,7 @@ export class LockliftExecutor {
       lt: this.blockchainLt,
       shardAccount: receiverAcc,
       now,
-      libs: null,
+      libs: this.state.libs.size > 0 ? beginCell().storeDictDirect(this.state.libs).endCell() : null,
       debugEnabled: true,
       randomSeed: null,
       verbosity: "short",
@@ -231,7 +235,7 @@ export class LockliftExecutor {
         lt: this.blockchainLt,
         shardAccount: receiverAcc,
         now,
-        libs: null,
+        libs: this.state.libs.size > 0 ? beginCell().storeDictDirect(this.state.libs).endCell() : null,
         debugEnabled: true,
         randomSeed: null,
         verbosity: "full_location_stack_verbose",
@@ -253,6 +257,18 @@ export class LockliftExecutor {
     }
     this.blockchainLt += 1000n;
     if (res.result.shardAccount) {
+      if (message.dst?.startsWith("-1")) {
+        const loadedShardAccount = loadShardAccount(Cell.fromBase64(res.result.shardAccount).asSlice()).account;
+        if (loadedShardAccount?.storage.state.type === "active") {
+          const libraries = loadedShardAccount.storage.state.state.libraries;
+          libraries?.keys().map(el => {
+            const lib = libraries.get(el);
+            if (lib && lib.public && lib.root) {
+              this._setLibrary(el, lib.root);
+            }
+          });
+        }
+      }
       this._setAccount1(message.dst as string, res.result.shardAccount);
 
       this.saveTransaction(decodedTx, trace);

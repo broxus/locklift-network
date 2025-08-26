@@ -6,7 +6,7 @@ import _ from "lodash";
 import { GIVER_ADDRESS, GIVER_BOC, ZERO_ADDRESS } from "./constants";
 import { AccountFetcherCallback } from "../types";
 import { TychoExecutor } from "@tychosdk/emulator";
-import { beginCell, Cell, storeShardAccount, loadShardAccount, Dictionary } from "@ton/core";
+import { beginCell, Cell, Dictionary, loadShardAccount, storeShardAccount } from "@ton/core";
 import type { ExecutorEmulationResult } from "@ton/sandbox";
 import { bocFromShardAccount, parseBlocks, shardAccountFromBoc } from "./utils";
 
@@ -83,8 +83,8 @@ export class LockliftExecutor {
 
   async initialize() {
     const config = await this.transport.getBlockchainConfig();
-    const configBok = Cell.fromBase64(config.boc).asSlice().loadRef().toBoc().toString("base64");
-    this.blockchainConfig = configBok;
+
+    this.blockchainConfig = Cell.fromBase64(config.boc).asSlice().loadRef().toBoc().toString("base64");
     this.globalId = Number(config.globalId);
     this.tychoExecutor = await TychoExecutor.create();
   }
@@ -103,10 +103,8 @@ export class LockliftExecutor {
   }
 
   setAccount(address: Address | string, boc: string, type: "accountStuffBoc" | "fullAccountBoc") {
-    const fullContractState = nt.parseFullAccountBoc(
-      type === "accountStuffBoc" ? nt.makeFullAccountBoc(boc) : boc,
-    ) as nt.FullContractState;
-    this.state.accounts[address.toString()] = bocFromShardAccount(shardAccountFromBoc(fullContractState.boc));
+    const newBoc = type === "accountStuffBoc" ? nt.makeFullAccountBoc(boc) : boc;
+    this.state.accounts[address.toString()] = bocFromShardAccount(shardAccountFromBoc(newBoc, 0n));
   }
 
   async _getAccount(address: Address | string): Promise<string | undefined> {

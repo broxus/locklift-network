@@ -45,8 +45,16 @@ export class LockliftNetwork {
     return this._transport.getBlockchainConfig();
   }
 
-  getTxTrace(txHash: string): nt.EngineTraceInfo[] | undefined {
+  getTxTrace(txHash: string): { parsed: nt.EngineTraceInfo[]; raw: string } | undefined {
     return this._executor.getTxTrace(txHash);
+  }
+
+  enableTraces(): void {
+    this._executor.enableTraces();
+  }
+
+  disableTraces(): void {
+    this._executor.disableTraces();
   }
 }
 

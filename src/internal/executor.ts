@@ -3,7 +3,7 @@ import { BlockchainConfig } from "nekoton-wasm";
 import { Address, LT_COLLATOR } from "everscale-inpage-provider";
 import { Heap } from "heap-js";
 import _ from "lodash";
-import { GIVER_ADDRESS, GIVER_BOC, ZERO_ADDRESS } from "./constants";
+import { GIVER_ADDRESS_EVER_WALLET, GIVER_BOC_EVER_WALLET, ZERO_ADDRESS } from "./constants";
 import { AccountFetcherCallback } from "../types";
 import { TychoExecutor } from "@tychosdk/emulator";
 import { beginCell, Cell, Dictionary, loadShardAccount, storeShardAccount } from "@ton/core";
@@ -28,7 +28,7 @@ type ExecutorState = {
   // txId -> tx
   transactions: { [id: string]: nt.JsRawTransaction };
   // txId -> trace
-  traces: { [id: string]: nt.EngineTraceInfo[] };
+  traces: { [id: string]: { parsed: nt.EngineTraceInfo[]; raw: string } };
   // msgHash -> tx_id
   msgToTransaction: { [msgHash: string]: string };
   // address -> tx_ids
@@ -43,6 +43,7 @@ interface LockliftTransport {
 }
 
 export class LockliftExecutor {
+  private traceEnabled = false;
   private state: ExecutorState = {} as ExecutorState;
   private snapshots: { [id: string]: ExecutorState } = {};
   private nonce = 0;
@@ -78,7 +79,9 @@ export class LockliftExecutor {
       lastTransactionLt: 0n,
     });
 
-    this.state.accounts[GIVER_ADDRESS] = bocFromShardAccount(shardAccountFromBoc(nt.makeFullAccountBoc(GIVER_BOC), 0n));
+    this.state.accounts[GIVER_ADDRESS_EVER_WALLET] = bocFromShardAccount(
+      shardAccountFromBoc(nt.makeFullAccountBoc(GIVER_BOC_EVER_WALLET), 0n, 999999999999999999999999999999n),
+    );
   }
 
   async initialize() {
@@ -122,6 +125,14 @@ export class LockliftExecutor {
     //   })
   }
 
+  enableTraces() {
+    this.traceEnabled = true;
+    console.log("VM traces enabled, note that performance is downgraded!");
+  }
+  disableTraces() {
+    this.traceEnabled = false;
+  }
+
   getAccounts(): Record<string, nt.FullContractState> {
     return Object.entries(this.state.accounts).reduce((acc, next) => {
       const [address, account] = next;
@@ -134,11 +145,11 @@ export class LockliftExecutor {
     }, {} as Record<string, nt.FullContractState>);
   }
 
-  getTxTrace(txId: string): nt.EngineTraceInfo[] | undefined {
+  getTxTrace(txId: string): { parsed: nt.EngineTraceInfo[]; raw: string } | undefined {
     return this.state.traces[txId];
   }
 
-  private saveTransaction(tx: nt.JsRawTransaction, trace: nt.EngineTraceInfo[]) {
+  private saveTransaction(tx: nt.JsRawTransaction, trace: { parsed: nt.EngineTraceInfo[]; raw: string }) {
     this.state.transactions[tx.hash] = tx;
     this.state.msgToTransaction[tx.inMessage.hash] = tx.hash;
     this.state.addrToTransactions[tx.inMessage.dst as string] = [tx.hash].concat(
@@ -204,7 +215,7 @@ export class LockliftExecutor {
     const messageCell = Cell.fromBase64(message.boc);
 
     const now = Math.floor(this.clock!.nowMs / 1000);
-
+    let trace: Array<nt.EngineTraceInfo> = [];
     let res: ExecutorEmulationResult = await this.tychoExecutor.runTransaction({
       config: this.blockchainConfig,
       message: messageCell,
@@ -214,17 +225,15 @@ export class LockliftExecutor {
       libs: this.state.libs.size > 0 ? beginCell().storeDictDirect(this.state.libs).endCell() : null,
       debugEnabled: true,
       randomSeed: null,
-      verbosity: "short",
+      verbosity: this.traceEnabled ? "full_location_stack_verbose" : "short",
       ignoreChksig: true,
     });
-
     if (!res.result.success) {
       console.log("Error in executor: ", res.result.error);
       return;
     }
 
     const decodedTx = nt.decodeRawTransaction(res.result.transaction);
-    let trace: Array<nt.EngineTraceInfo> = [];
     if (decodedTx.description.aborted) {
       // run 1 more time with trace on
       res = await this.tychoExecutor.runTransaction({
@@ -239,10 +248,10 @@ export class LockliftExecutor {
         verbosity: "full_location_stack_verbose",
         ignoreChksig: true,
       });
+    }
 
-      if (res.result.success && res.result.vmLog) {
-        trace = parseBlocks(res.result.vmLog);
-      }
+    if (res.result.success && res.result.vmLog) {
+      trace = parseBlocks(res.result.vmLog);
     }
 
     if (res.logs || res.debugLogs) {
@@ -269,7 +278,10 @@ export class LockliftExecutor {
       }
       this._setAccount1(message.dst as string, res.result.shardAccount);
 
-      this.saveTransaction(decodedTx, trace);
+      this.saveTransaction(decodedTx, {
+        parsed: trace,
+        raw: res.result.vmLog || "",
+      });
       decodedTx.outMessages.map((msg: nt.JsRawMessage) => {
         if (msg.msgType === "ExtOut") return; // event
         this.enqueueMsg(msg);

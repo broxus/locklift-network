@@ -29,14 +29,34 @@ export const parseBlocks = (input: string): Array<nt.EngineTraceInfo> => {
   });
 };
 
-export const shardAccountFromBoc = (boc: string, lastTxLt?: bigint): ShardAccount => {
+export const shardAccountFromBoc = (boc: string, lastTxLt?: bigint, newBalance?: bigint): ShardAccount => {
   const a = nt.parseFullAccountBoc(boc);
   const acc = a?.boc ? loadAccount(Cell.fromBase64(a.boc).beginParse()) : null;
+  let lastTransactionLt = acc?.storage.lastTransLt || 0n;
+  if (lastTxLt != undefined) {
+    lastTransactionLt = lastTxLt;
+  }
+  let balance = acc?.storage.balance.coins || 0n;
+  if (newBalance != undefined) {
+    balance = newBalance;
+  }
   return {
-    account: acc,
+    account: acc
+      ? {
+          ...acc,
+          storage: {
+            ...acc.storage,
+            lastTransLt: lastTransactionLt,
+            balance: {
+              ...acc.storage.balance,
+              coins: balance,
+            },
+          },
+        }
+      : null,
     lastTransactionHash: 0n,
 
-    lastTransactionLt: lastTxLt || acc?.storage.lastTransLt || 0n,
+    lastTransactionLt: lastTransactionLt,
   };
 };
 

@@ -1,13 +1,13 @@
 import * as nt from "nekoton-wasm";
 import { LockliftExecutor } from "./executor";
-import { EMPTY_STATE, MAIN_CONFIG, TON_CONFIG } from "./constants";
+import { EMPTY_STATE, EVER_MAIN_CONFIG, TEST_CODE_HASH, TON_CONFIG, TYCHO_CONFIG, ZERO_ADDRESS } from "./constants";
 import { BlockchainConfig, NetworkCapabilities } from "nekoton-wasm";
 
 export class LockliftTransport implements nt.IProxyConnector {
   private executor: LockliftExecutor | undefined;
   private cache: { [id: string]: any } = {};
   private readonly networkConfig: string;
-  constructor(networkConfig: "EVER" | "TON" | { custom: string } | undefined) {
+  constructor(networkConfig: "EVER" | "TON" | "TYCHO-TESTNET" | { custom: string } | undefined) {
     if (typeof networkConfig === "object") {
       this.networkConfig = networkConfig.custom;
       console.log("Locklift network is using custom blockchain config");
@@ -18,8 +18,17 @@ export class LockliftTransport implements nt.IProxyConnector {
       console.log("Locklift network is using TON blockchain config");
       return;
     }
-    this.networkConfig = MAIN_CONFIG;
-    console.log("Locklift network is using EVER blockchain");
+    if (networkConfig === "EVER") {
+      this.networkConfig = EVER_MAIN_CONFIG;
+      console.log("Locklift network is using TYCHO blockchain config");
+      return;
+    }
+    this.networkConfig = TYCHO_CONFIG;
+    console.log("Locklift network is using TYCHO-TESTNET blockchain");
+  }
+
+  getLibraryCell(hash: string): Promise<string | undefined> {
+    throw new Error("Method not implemented.");
   }
 
   setExecutor(executor: LockliftExecutor): void {
@@ -35,14 +44,15 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getAccountsByCodeHash(codeHash: string, limit: number, continuation?: string): Promise<string[]> {
+  async getAccountsByCodeHash(codeHash: string, limit: number, continuation?: string): Promise<string[]> {
+    if (codeHash === TEST_CODE_HASH) {
+      return [ZERO_ADDRESS.toString()];
+    }
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const q = Object.entries(this.executor!.getAccounts())
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .filter(([_, state]) => state.codeHash === codeHash)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .map(([address, _]) => address);
-    return Promise.resolve(q);
+    return q;
   }
 
   // @ts-ignore
@@ -67,10 +77,8 @@ export class LockliftTransport implements nt.IProxyConnector {
   }
 
   async getContractState(address: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const state = await this.executor!.getAccount(address);
-
-    return Promise.resolve(state?.boc == null ? EMPTY_STATE : nt.makeFullAccountBoc(state.boc));
+    const state = await this.executor!._getAccount(address);
+    return state ? nt.parseShardAccountBoc(state)?.boc || EMPTY_STATE : EMPTY_STATE;
   }
 
   getDstTransaction(msgHash: string): Promise<string | undefined> {

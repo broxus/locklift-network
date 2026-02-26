@@ -48,7 +48,7 @@
     "everscale-standalone-client": "^3.0.2",
     "heap-js": "2.3.0",
     "lodash": "^4.17.21",
-    "nekoton-wasm": "npm:nekoton-wasm-locklift@^1.28.0",
+    "nekoton-wasm": "npm:nekoton-wasm-locklift@^1.29.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
